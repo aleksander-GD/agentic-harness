@@ -1,0 +1,14 @@
+{
+  "name": "agentic-harness",
+  "description": "A gated, autonomous TDD harness for Claude Code.",
+  "owner": {
+    "name": "aleksander-GD"
+  },
+  "plugins": [
+    {
+      "name": "harness",
+      "source": "./plugin",
+      "description": "Autonomous, gated TDD Runs from a Spec to a pull request, with the owner approving each Plan and reviewing each PR."
+    }
+  ]
+}

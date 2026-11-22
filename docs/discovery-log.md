@@ -698,3 +698,23 @@ The owner confirmed a shared understanding of the revised design "for now". Disc
 **Next step:** build v1 as scoped in C39.
 
 If anything changes during the build, it enters through the Friction Log and new rounds or ADRs. It is never rewritten silently.
+
+---
+
+## Build notes (2026-11-23)
+
+These are decisions taken while starting to build v1. Each one either fills in a detail that discovery left open, or was forced by a fact found in the docs.
+
+### Confirmed
+
+- **C41. Supported stacks.** The template supports TypeScript (Next.js) first, because the portfolio site is the first real project. Laravel/PHP comes second. The Gate scripts are stack-agnostic and read a per-project configuration.
+- **C42. Coding conventions.**
+  - **Mechanical rules are Gates, not skill prose:** linter, formatter and strict type-checker configuration in the template.
+  - **Skills carry only judgment rules** that no tool can check, such as domain-first structure and how tests should be written.
+- **C43. Source for the Laravel/PHP conventions.** They are inspired by the owner's employer's internal guidelines, which are under K2 and must not be copied. Those guidelines appear to follow a publicly published Laravel/PHP style guide closely. The harness's own PHP conventions should cite and build on that public source. This is to be verified when the PHP template is built.
+
+### Facts found in the docs
+
+- **Workflow scripts cannot run commands or read files.** Only the agents they start can. This leads to [ADR-0006](adr/0006-ci-is-the-binding-gate.md): CI is the binding Gate, and Gates inside a Run are an inner loop.
+- **A plugin cannot ship sandbox or permission settings.** This is not documented. Those settings therefore live in the template's `.claude/settings.json`, which resolves an open fact from the revised summary.
+- **The plugin's `bin/` executables are put on the agent's PATH.** The Gate scripts ship there.

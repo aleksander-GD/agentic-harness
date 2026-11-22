@@ -32,3 +32,4 @@ At a stop, the script writes what the owner needs to see and then exits. After t
 - The run script is the main piece of harness code, so it is built test-first like any other code.
 - The interactive main session (C11) is still the way to work outside Runs.
 - v1 implements the run script as Claude Code workflows inside the plugin, not as a separate command-line tool. See [ADR-0005](0005-v1-runs-as-plugin-workflows-on-subscription.md).
+- Workflow scripts cannot execute commands. Gates inside a Run are therefore an inner loop, and CI is the binding Gate. See [ADR-0006](0006-ci-is-the-binding-gate.md).
