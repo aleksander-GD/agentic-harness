@@ -369,6 +369,8 @@ Research input: [context and memory sources](research/2026-11-22-context-memory-
 
 ## Discovery summary (2026-11-22)
 
+> **Superseded** by the [revised summary](#discovery-summary-revised-2026-11-22) at the end of this log. Discovery was reopened in Round 11.
+
 ### Problem statement
 
 The owner is moving from project management back to hands-on software engineering. They need a way of building software with AI agents that:
@@ -447,3 +449,252 @@ The owner confirmed a shared understanding of the design. Discovery is closed.
 
 - Run a separate discovery for the first project. This unblocks E1.
 - Then follow the MVP order in C26.
+
+---
+
+## Round 11 (2026-11-22): discovery reopened, the harness becomes the primary evidence
+
+### What changed
+
+**The owner's clarified goal.** The harness is the primary evidence. It is an environment that runs on its own once it is given a feature specification, and it stops only at stages that need the owner's judgment. At minimum those are the plan and the final review.
+
+Secondary evidence:
+
+- what is built with the harness;
+- how the harness is improved over time.
+
+Field Notes sit alongside this; they are not the centre of the portfolio.
+
+**Decisions this supersedes or reopens:**
+
+- **C6 (what the showcase is).** Superseded: the harness is now the primary evidence, not one part of it.
+- **C26 (MVP scope and order).** Reopened: the MVP is now the autonomous loop itself. Building first and measuring a baseline first are no longer in order.
+- **C11 (orchestration).** Refined: autonomous runs are driven by a deterministic run script. The model runs inside each stage, never between stages.
+- **C16 (isolation scales with autonomy).** Unchanged, but its consequence moves forward: the devcontainer is now part of the MVP, because autonomous runs are unattended by definition.
+- **ADR-0001 (spec-owner authorship).** Under review: which stages stop for the owner is still open (Q28).
+
+### Confirmed
+
+- **C28 (Q29). How a run works.**
+  - **Starting a run.** The owner starts a run with one command, which takes either a Spec or a plain prompt. A prompt is the usual input for a single feature, or for work on an existing repository.
+  - **Isolation.** The run executes headless inside the devcontainer.
+  - **Stages.** Each stage is a separate agent invocation with a fresh context. The run script decides the order of stages.
+  - **State.** State between stages lives in files and git; nothing waits in memory. At a stop, the script writes its output and exits, and a resume command continues the run after the owner approves.
+  - **Output.** A pull request into `develop`. That pull request is the final review, and branch protection enforces it.
+
+### Open
+
+- **Q28. Which stages stop for the owner.** The owner is unsure about option (b), which combines a plan with a test list.
+- **Q30. How a multi-feature Spec becomes Runs.** Either one plan stop per feature, or planning several features up front.
+
+---
+
+## Round 12 (2026-11-22): the Plan stop and multi-feature Specs
+
+### Confirmed
+
+- **C29 (Q28). The Plan stop holds behaviours and approach only.**
+  - The agent drafts the Behaviour List and the approach. The owner edits and approves both.
+  - There is no separate test list, because it would duplicate the Behaviour List (the owner's objection).
+  - A deterministic Gate checks that every approved behaviour has at least one test tagged with its ID.
+  - This changes authorship. The owner *approves* the Behaviour List instead of writing it, and first sees the tests at pull request review.
+  - See [ADR-0003](adr/0003-autonomous-runs-with-two-owner-stops.md), which supersedes ADR-0001.
+- **C30 (Q30). One feature at a time.** For each feature the Run goes:
+  1. Plan, then the owner's approval;
+  2. autonomous implementation;
+  3. pull request, then the next feature.
+
+  Plans are always written against current code. Pipelining (planning the next feature while the owner reviews the current pull request) is added only if the friction log shows the stops becoming a bottleneck.
+- **C31.** Runs are orchestrated by a deterministic script, and state between stages lives in files and git. See [ADR-0004](adr/0004-runs-orchestrated-by-deterministic-script.md). This records the reasoning behind C28.
+
+### Risks
+
+- **R1. Weak tests.** Nobody reviews test bodies before the pull request, so tests that pass but prove little are the main residual risk. Mutation testing is the candidate fix. It enters only when the friction log shows weak tests getting through.
+
+---
+
+## Round 13 (2026-11-22): the v1 Run, how it is invoked, existing repos
+
+### Confirmed
+
+- **C32 (Q31). The v1 Run for one feature has six stages:**
+  1. **Plan.** Ends at a stop for the owner's approval.
+  2. **Red.** Tagged tests, committed as the Red Commit, which must fail.
+  3. **Green.** The implementation.
+  4. **Gates:**
+     - tests;
+     - static analysis;
+     - the test lock;
+     - behaviour coverage.
+  5. **Review.** A fresh agent reviews the diff against the Plan and the glossary.
+  6. **Pull request.** Ends at a stop for the owner's review.
+
+  **Retries.** Gate failures and serious review findings both send the Run back to Green. They share a budget of 3 attempts. After that, the Run stops and reports what is still failing. It never loops without a limit.
+- **C33 (Q32). Stages are invoked headless with `claude -p`, from a run script written in TypeScript and built test-first.**
+  - **Facts to check before building:**
+    - Do headless runs authenticate through the owner's subscription?
+    - Do the subscription terms allow automated runs?
+  - **New input from the owner.** A colleague's harness lives entirely inside a Claude Code plugin: flows, agents, hooks and guardrails. It shows, in a sidebar inside Claude Code, which agents are working and which have stopped to wait for a human.
+  - **Consequence.** Visibility of a Run's state is a new requirement. It also reopens *where* the run script lives: outside Claude Code as a command-line tool, or inside it as a plugin. See T7.
+
+### Tension surfaced
+
+- **T7. An external command-line tool or an in-app plugin?**
+  - **External tool calling `claude -p`:**
+    - **For:** headless; works inside the devcontainer; easy to test.
+    - **Against:** no visualization unless it is built.
+  - **Plugin running inside Claude Code:**
+    - **For:** the app's own status display and "needs attention" signals come for free.
+    - **Against:** it may not run unattended inside the devcontainer, which C16 requires. Pauses may also not survive the way ADR-0004 requires.
+  - **Status:** waiting on a check of Claude Code's documented capabilities.
+
+### Challenged
+
+- **Q33. Existing repositories.**
+  - **The owner wants them supported**, with an explorer agent that gathers the information needed.
+  - **Explorer agent:** acceptable as a *read-only search sub-agent*, which C23 already allows. Context isolation is the strongest documented reason for having a sub-agent.
+  - **The real problem with existing repositories is Gates, not information.** A repository without tests or static analysis gives a Run nothing deterministic to answer to. An explorer can describe the repository, but it cannot make the repository checkable.
+  - **Scope:** open (Round 14).
+
+### T7 update: findings from the docs check
+
+Source: [runtime options](research/2026-11-22-runtime-options.md).
+
+- **The terms are the deciding fact.** The Consumer Terms bar scripted, non-human access except through an API key or with explicit permission. The docs do support subscription tokens for CI, so whether unattended `claude -p` on a subscription is allowed remains unresolved.
+- **This puts C33 at risk.** A headless command-line tool running on the subscription (C22) rests on a question about the terms.
+- **Claude Code workflows fit the design.** A workflow is a deterministic JavaScript orchestrator, shippable in a plugin and watchable with `/workflows`. Workflows cannot pause for a human, but a Run's two stops fall exactly on workflow boundaries: a *plan* workflow, then a *build* workflow. State between the two lives in files and git, which keeps ADR-0004's intent.
+- **Visibility is native.**
+  - Agent view shows Working, Needs input and Completed.
+  - The `Notification` hook and desktop notifications cover "needs attention".
+  - Mods can draw a sidebar pane, as the colleague's harness does.
+- **Open decision (Round 14):** whether Runs are paid for by subscription, which means started by the owner inside Claude Code, or by API key, which allows fully unattended runs.
+
+---
+
+## Round 14 (2026-11-22): visibility, existing repos, time box
+
+### Confirmed
+
+- **C34 (Q34). Visibility is a v1 requirement.** The owner can see each Run's current Stage and is notified when a Run needs them. The mechanism is decided with T7.
+- **C35 (Q35, partly). Adopting existing repositories.**
+  - Existing repositories are supported through a one-time *adopt* step:
+    1. A read-only explorer sub-agent maps the repository.
+    2. It proposes a Gate configuration and a starting glossary.
+    3. The owner approves them, once per repository.
+  - Runs are refused until the repository has a runnable test command.
+- **C36 (Q36). No time box.** The owner considers it irrelevant. This removes the 6-week time box from C26.
+
+### Challenged
+
+- **Q35. The owner wants client repositories supported as well as personal ones.** This reverses C15, which kept client projects out of the MVP, and runs into K1, the employer's AI policy. Round 15 resolves it.
+
+---
+
+## Round 15 (2026-11-22): client repos, runtime
+
+### Confirmed
+
+- **C38 (Q38). Client repositories stay out of v1. C15 stands.**
+  - Adoption (C35) applies only to personal repositories for now.
+  - According to the owner, the employer has no say in this.
+  - The remaining conditions are technical, and client repositories come back as their own decision once all of them are handled:
+    - credentials are low-value only (C18);
+    - the harness never reads real personal data;
+    - nothing touches production.
+
+- **C37 (Q37). v1 runs on the subscription, and the owner starts each Run inside Claude Code.**
+  - **How a Run works:** two plugin workflows, `plan` then `build`. The `build` workflow runs in the devcontainer.
+  - **Visibility:** native to Claude Code.
+  - **What changes:** this supersedes C33 and resolves T7. See [ADR-0005](adr/0005-v1-runs-as-plugin-workflows-on-subscription.md).
+  - **Deferred:** unattended Runs paid for with an API key are the upgrade path.
+
+---
+
+## Round 16 (2026-11-22): v1 scope and evidence
+
+### Confirmed
+
+- **C39 (Q39). v1 scope.** This supersedes C26.
+  - **The plugin:**
+    - `plan`, `build` and `adopt` workflows;
+    - `explorer` and `reviewer` agents;
+    - skills for TDD conventions and the Learner;
+    - hooks for the test lock and for notifications.
+  - **The project template:**
+    - CI running the Gates;
+    - a devcontainer;
+    - a setup script that creates `develop` and applies branch protection;
+    - `.claude/` settings, as a fallback.
+  - **A side pane** is optional. Agent view covers C34.
+- **C40 (Q40). Evidence comes from the four metrics (C25), recorded for every Run, plus a Friction Log.**
+  - Every addition after v1 must cite a Friction Log entry, and its effect is measured across Runs.
+  - E1, the baseline without the harness, is retired. A claim that "the harness beats plain Claude Code" is therefore out of scope.
+
+**The owner asked why** the template holds CI and a devcontainer, and why model routing is excluded. The answers are already in ADR-0002 and C23. They were re-explained in conversation, and the decisions stand.
+
+---
+
+## Discovery summary (revised, 2026-11-22)
+
+### Problem statement
+
+The owner is moving from project management back into hands-on software engineering.
+
+**The harness is the primary evidence.** It is an environment that takes a Spec or a prompt and implements it feature by feature, on its own. It stops only for:
+
+- the owner's approval of each Plan;
+- the owner's review of each pull request.
+
+**The secondary evidence** is what gets built with the harness, and how the harness is improved, guided by the Friction Log and the metrics. Field Notes sit alongside both.
+
+### Architecture
+
+| Concern | Decision | Reference |
+|---|---|---|
+| Owner's stops | Plan approval (behaviours and approach), then pull request review | C29, ADR-0003 |
+| Orchestration | Deterministic Claude Code workflows (`plan`, `build`, `adopt`). Every Stage runs in a fresh context, and state lives in files and git | C31, ADR-0004, ADR-0005 |
+| Runtime | Subscription. The owner starts each Run in Claude Code, and `build` runs in the devcontainer | C37, ADR-0005 |
+| Distribution | The plugin holds how agents work. The project template holds what each repository enforces | C12, ADR-0002 |
+| Agents | Explorer (read-only) and reviewer (fresh context). Every other role is a workflow, a skill, a Gate or CI | C39 |
+| Done | Gates decide: tests, static analysis, the test lock, behaviour coverage. Retries share a budget of 3, then the Run stops and reports | C32 |
+| Memory | Curated Project Knowledge in the repository. The agent proposes changes and the owner approves them | C20, C21 |
+| Models | One model for the Run. A smaller model is allowed for the explorer only. No routing | C23 |
+| Security | Threat model covers both accidents and injection. Isolation scales with autonomy. Credentials are low-value only. Branch protection is applied by script | C14–C19 |
+| Repositories | Template repositories, plus personal repositories through `adopt`. No client repositories | C35, C38 |
+| Visibility | Agent view, `/workflows`, and notification hooks | C34 |
+| Evidence | The four metrics for every Run, plus the Friction Log | C25, C40 |
+
+### Deferred, with the trigger that brings each back
+
+| Item | Trigger |
+|---|---|
+| Unattended Runs paid for with an API key | Runs should start without the owner |
+| Model routing | Usage limits are hit, or Runs move to an API key |
+| Mutation testing | The Friction Log shows weak tests getting through (R1) |
+| Planning the next feature while the owner reviews the current one | The owner's stops become the bottleneck |
+| Generated index or code map | The Friction Log shows re-exploring the code is costly |
+| Side pane | Agent view is not enough |
+| Client repositories | All technical conditions in C38 are met |
+| Research and PM domains | A concrete need appears |
+
+### Open facts to check while building
+
+- Can a plugin ship sandbox and permission settings?
+- Plugin sub-agents ignore `permissionMode` and `hooks`. Their guardrails must therefore come from settings or the sandbox.
+- Can agent view and notifications see a CLI session running inside the devcontainer?
+- Does the GitHub plan support branch protection on private repositories?
+
+### Experiments
+
+- **E2. Spec tampering**, with and without the test lock.
+- **E3. Red-team the harness**, after v1.
+
+---
+
+## Closure, revised (2026-11-22)
+
+The owner confirmed a shared understanding of the revised design "for now". Discovery is closed again.
+
+**Next step:** build v1 as scoped in C39.
+
+If anything changes during the build, it enters through the Friction Log and new rounds or ADRs. It is never rewritten silently.
