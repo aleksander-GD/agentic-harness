@@ -1,0 +1,10 @@
+{
+  "name": "harness",
+  "version": "0.1.0",
+  "description": "Autonomous, gated TDD Runs from a Spec to a pull request, with the owner approving each Plan and reviewing each PR.",
+  "author": {
+    "name": "aleksander-GD"
+  },
+  "repository": "https://github.com/aleksander-GD/agentic-harness",
+  "license": "MIT"
+}
